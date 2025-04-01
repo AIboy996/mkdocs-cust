@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[project]
+name = "mkdocs-cust"
+version = "0.0.1"
+requires-python = ">=3.10"
+dependencies = [
+    "mkdocs>=1.5.3",
+]
+authors = [
+  { name="Yang Zhang", email="mail@yangzhang.site" },
+]
+description = "Customise the building process for my Homepage."
+readme = "readme.md"
+license = {file = "LICENSE"}
+keywords = ["mkdocs", "blog", "diy"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/AIboy996/mkdocs-cust"
+
+[project.entry-points."mkdocs.plugins"]
+mkdocs-cust = "mkdocs_cust.plugin:CustPlugin"
