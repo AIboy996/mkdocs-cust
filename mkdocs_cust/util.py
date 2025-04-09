@@ -1,11 +1,23 @@
 from parsel import Selector
+from lxml import html
 
 
-def add_target_blank_to_links(html):
+def pretifier(func):
+    """装饰器，标准化html文本格式"""
+
+    def prettify_html(html_text: str, *args, **kwargs):
+        html_text = html.tostring(html.fromstring(html_text), encoding="unicode")
+        return func(html_text, *args, **kwargs)
+
+    return prettify_html
+
+
+@pretifier
+def add_target_blank_to_links(raw_html_text: str):
     """
     在给定的 HTML 中，为符合特定条件的 <a> 标签添加 target="_blank" 属性
 
-    条件："a[href*='//']:not(.md-content__button):not(:has(img))"
+    xpath选择器："//a[contains(@href, '//') and not(contains(@class, 'md-content__button')) and not(img)]"
 
     参数:
         html (str): 输入的 HTML 字符串
@@ -13,20 +25,23 @@ def add_target_blank_to_links(html):
     返回:
         str: 处理后的 HTML 字符串
     """
-    selector = Selector(text=html)
+    selector = Selector(text=raw_html_text)
 
     # 查找所有符合条件的 a 标签
-    links = selector.css("a[href*='//']:not(.md-content__button):not(:has(img))")
+    links = selector.xpath(
+        "//a[contains(@href, '//') and not(contains(@class, 'md-content__button')) and not(img)]"
+    )
 
     for link in links:
-        # 获取当前元素的完整 HTML
         original = link.get()
         # 创建一个新元素并添加 target="_blank"
-        new_tag = original.replace("<a ", '<a target="_blank" ', 1)
+        element = html.fromstring(original)
+        element.set("target", "_blank")
+        new_tag = html.tostring(element, encoding="unicode")
         # 替换原始 HTML 中的内容
-        html = html.replace(original, new_tag)
+        raw_html_text = raw_html_text.replace(original, new_tag)
 
-    return html
+    return raw_html_text
 
 
 if __name__ == "__main__":

@@ -16,6 +16,6 @@ class CustPlugin(BasePlugin):
 
     @plugins.event_priority(50)
     def on_page_content(self, html, *, page, config, files):
-        if self.config['external_link_target_blank']:
+        if self.config["external_link_target_blank"]:
             html = add_target_blank_to_links(html)
         return html
