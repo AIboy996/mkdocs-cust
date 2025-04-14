@@ -10,7 +10,6 @@ import os
 from mkdocs_cust.util import (
     add_target_blank_to_links,
     ipynb_to_html,
-    get_body,
     get_toc_tokens,
 )
 
@@ -61,8 +60,9 @@ class CustPlugin(BasePlugin):
     def on_pre_page(self, page, *, config, files):
         if page.file.src_uri.endswith(".ipynb"):
             page.read_source = lambda x: None
-            page.markdown = ipynb_to_html(page.file.abs_src_path)
-            page.meta = {"source_file": "ipynb"}
+            page.markdown, meta = ipynb_to_html(page.file.abs_src_path)
+            meta.update({"source_file": "ipynb"})
+            page.meta = meta
         return page
 
     @plugins.event_priority(50)
@@ -70,7 +70,6 @@ class CustPlugin(BasePlugin):
         if self.config["external_link_target_blank"]:
             html = add_target_blank_to_links(html)
         if page.file.src_uri.endswith(".ipynb"):
-            html = get_body(html)
             toc_tokens = get_toc_tokens(html)
             page.toc = get_toc(toc_tokens)
         return html

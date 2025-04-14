@@ -7,11 +7,12 @@ where = ["."]
 
 [project]
 name = "mkdocs-cust"
-version = "0.0.2"
+version = "0.1.1"
 requires-python = ">=3.10"
 dependencies = [
     "mkdocs>=1.5.3",
     "parsel",
+    "nbconvert",
 ]
 authors = [
   { name="Yang Zhang", email="mail@yangzhang.site" },

@@ -6,4 +6,5 @@ Customise the building process for my Homepage:
 plugins:
   - mkdocs-cust:
       external_link_target_blank: true
+      convert_ipynb: true
 ```

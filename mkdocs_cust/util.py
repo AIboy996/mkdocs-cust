@@ -47,6 +47,45 @@ def add_target_blank_to_links(raw_html_text: str):
     return raw_html_text
 
 
+def get_body(raw_html_text):
+    """
+    从HTML中提取body部分
+    """
+    # 使用lxml解析HTML
+    tree = html.fromstring(raw_html_text)
+    # 提取body部分
+    body = tree.xpath("//body")[0]
+    # 将body转换为字符串
+    body_str = html.tostring(body, encoding="unicode")
+    return body_str
+
+
+@pretifier
+def get_meta(raw_html_text):
+    tree = Selector(raw_html_text)
+    first_markdown_cell = tree.css(
+        ".jp-Cell.jp-MarkdownCell .jp-RenderedHTMLCommon"
+    ).get()
+    meta_dict = {}
+    if first_markdown_cell:
+        # 使用正则表达式提取两个<hr/>标签之间的内容
+        match = re.search(r"<hr>(.*?)<hr>", first_markdown_cell, re.DOTALL)
+        if match:
+            content_between_hr = match.group(1).strip()
+            meta_selector = Selector(text=content_between_hr)
+            # 提取<p>标签内容作为键
+            for p_tag in meta_selector.xpath("//p"):
+                key = p_tag.xpath("text()").get().strip(":")
+                # 提取对应的<ul>标签内容作为值
+                ul_tag = p_tag.xpath("following-sibling::ul[1]")
+                if ul_tag:
+                    values = ul_tag.xpath(".//li/text()").getall()
+                    meta_dict[key] = values
+            # 删除掉meta信息
+            return raw_html_text.replace(first_markdown_cell, ""), meta_dict
+    return raw_html_text, meta_dict
+
+
 def ipynb_to_html(path):
     """
     将ipynb文件转换为html
@@ -63,22 +102,11 @@ def ipynb_to_html(path):
     html_exporter.template_name = "lab"
 
     # 转换为HTML
-    (body, resources) = html_exporter.from_notebook_node(notebook_content)
-
-    return body
-
-
-def get_body(raw_html_text):
-    """
-    从HTML中提取body部分
-    """
-    # 使用lxml解析HTML
-    tree = html.fromstring(raw_html_text)
-    # 提取body部分
-    body = tree.xpath("//body")[0]
-    # 将body转换为字符串
-    body_str = html.tostring(body, encoding="unicode")
-    return body_str
+    # 暂时不处理额外用到的资源
+    (raw_html, resources) = html_exporter.from_notebook_node(notebook_content)
+    body = get_body(raw_html)
+    reduced_body, meta = get_meta(body)
+    return reduced_body, meta
 
 
 class _TocToken(TypedDict):
