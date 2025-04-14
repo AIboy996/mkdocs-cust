@@ -1,5 +1,8 @@
+from __future__ import annotations
 from parsel import Selector
+import re
 from lxml import html
+from typing import TypedDict
 
 
 def pretifier(func):
@@ -44,16 +47,81 @@ def add_target_blank_to_links(raw_html_text: str):
     return raw_html_text
 
 
-if __name__ == "__main__":
-    sample_html = """
-    <div class="md-content">
-        <a href="https://example.com">外部链接1</a>
-        <a href="https://example.com" class="md-content__button">按钮链接</a>
-        <a href="/internal">内部链接</a>
-        <a href="https://example.com"><img src="url" alt="alternatetext"/></a>
-        <a href="http://another.com">外部链接2</a>
-    </div>
+def ipynb_to_html(path):
     """
+    将ipynb文件转换为html
+    """
+    import nbformat
+    from nbconvert import HTMLExporter
 
-    processed_html = add_target_blank_to_links(sample_html)
-    print(processed_html)
+    # 读取ipynb文件
+    with open(path, "r", encoding="utf-8") as f:
+        notebook_content = nbformat.read(f, as_version=4)
+
+    # 创建HTML导出器
+    html_exporter = HTMLExporter()
+    html_exporter.template_name = "lab"
+
+    # 转换为HTML
+    (body, resources) = html_exporter.from_notebook_node(notebook_content)
+
+    return body
+
+
+def get_body(raw_html_text):
+    """
+    从HTML中提取body部分
+    """
+    # 使用lxml解析HTML
+    tree = html.fromstring(raw_html_text)
+    # 提取body部分
+    body = tree.xpath("//body")[0]
+    # 将body转换为字符串
+    body_str = html.tostring(body, encoding="unicode")
+    return body_str
+
+
+class _TocToken(TypedDict):
+    level: int
+    id: str
+    name: str
+    children: list[_TocToken]
+
+
+def format_toc(toc: list) -> _TocToken:
+    res: _TocToken = {"level": 0, "id": "", "name": "", "children": []}
+    stack = [res]
+
+    for item in toc:
+        while stack and stack[-1]["level"] >= item["level"]:
+            stack.pop()
+        new_token: _TocToken = {**item, "children": []}
+        stack[-1]["children"].append(new_token)
+        stack.append(new_token)
+    assert (len(res["children"]) == 1) and (res["children"][0]["level"] == 1), (
+        "Document should start with h1 element and have precisely one h1 element."
+    )
+    return res["children"]
+
+
+def get_toc_tokens(html_content):
+    # Initialize TOC list
+    toc = []
+
+    # Regular expression to match header tags (h1-h6)
+    header_pattern = r'<(h[1-6])(?:\s+id="([^"]*)")?\s*>(.*?)</\1>'
+
+    # Find all headers
+    headers = re.findall(header_pattern, html_content, re.IGNORECASE | re.DOTALL)
+
+    for header in headers:
+        # Extract tag, id (if present), and text
+        tag, anchor, text = header
+        # Get header level (1-6)
+        level = int(tag[1])
+        # Clean text by removing extra whitespace
+        text = " ".join(text.strip().split())
+        text = re.sub(r"<[^>]+>", "", text).replace("¶", "")  # Remove HTML tags
+        # Add to TOC
+        toc.append({"level": level, "name": text, "id": anchor})
+    return format_toc(toc)
