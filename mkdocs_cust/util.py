@@ -53,6 +53,12 @@ def get_body(raw_html_text):
     """
     # 使用lxml解析HTML
     tree = html.fromstring(raw_html_text)
+    images = tree.xpath("//img")
+    for img in images:
+        # 添加 .nonzoom 类
+        existing_class = img.get("class", "")
+        new_class = f"{existing_class} nonzoom".strip()
+        img.set("class", new_class)
     # 提取body部分
     body = tree.xpath("//body")[0]
     # 将body转换为字符串
