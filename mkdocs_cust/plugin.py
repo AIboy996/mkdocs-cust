@@ -6,12 +6,12 @@ from mkdocs.structure.files import File, Files
 
 import logging
 import os
-import re
 
 from mkdocs_cust.util import (
     add_target_blank_to_links,
     ipynb_to_html,
     get_toc_tokens,
+    get_all_glightbox,
 )
 
 
@@ -80,29 +80,29 @@ class CustPlugin(BasePlugin):
         return html
 
     def on_post_page(self, output, *, page, config):
-        def replace_url(match):
-            nonlocal config
-            mark = match.group(1)  # ' or "
-            png_path = match.group(2)  # the path to the png image
-            ##########
-            # the png_path is relative to the page url, we need to convert it to absolute path
-            ##########
+        glightbox = get_all_glightbox(output)
+
+        def check_file(png_path):
+            """the png_path is relative to the page url, we need to convert it to absolute path"""
             real_path_lst = png_path.split(os.sep)[1:]
             if real_path_lst:
                 real_webp_relative_path = os.path.join(*real_path_lst) + ".webp"
             else:
-                return match.group(0)
+                return False
             page_dir = os.path.dirname(page.file.abs_src_path)
             webp_path_abs = os.path.join(page_dir, real_webp_relative_path)
-            if os.path.exists(webp_path_abs):
-                # if we can find the webp file, replace the url
-                return f"{mark}{png_path}.webp{mark}"
-            else:
-                return match.group(0)
+            return os.path.exists(webp_path_abs)
 
-        if self.config["webp_redirect"]:
-            pattern = re.compile(
-                r"(?P<url>[\"\'])([^\"\']+?\.png)(?P=url)", re.IGNORECASE
-            )
-            return pattern.sub(replace_url, output)
-        return super().on_post_page(output, page=page, config=config)
+        for node, img_path in glightbox:
+            if img_path.endswith(".png") and check_file(img_path):
+                new_img_path = img_path + ".webp"
+                new_tag = self.right_replace(node, img_path, new_img_path, 1)
+                output = output.replace(node, new_tag)
+
+        return output
+
+    @staticmethod
+    def right_replace(s, old, new, occurrence):
+        """Replace {old} to {new} at most {occurrence} times from right to left."""
+        li = s.rsplit(old, occurrence)
+        return new.join(li)

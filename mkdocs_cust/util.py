@@ -159,3 +159,15 @@ def get_toc_tokens(html_content):
         # Add to TOC
         toc.append({"level": level, "name": text, "id": anchor})
     return format_toc(toc)
+
+
+def get_all_glightbox(html_content: str) -> list[tuple[str, str]]:
+    """
+    查找所有包含glightbox类的a标签
+    """
+    sel = Selector(text=html_content)
+    nodes = sel.css("a.glightbox")
+    res = []
+    for node in nodes:
+        res.append((node.get(), node.css("img::attr(src)").get()))
+    return res
