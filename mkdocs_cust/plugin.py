@@ -87,12 +87,15 @@ class CustPlugin(BasePlugin):
             ##########
             # the png_path is relative to the page url, we need to convert it to absolute path
             ##########
-            real_relative_path = os.path.join(*png_path.split(os.sep)[1:]) + ".webp"
+            real_path_lst = png_path.split(os.sep)[1:]
+            if real_path_lst:
+                real_webp_relative_path = os.path.join(*real_path_lst) + ".webp"
+            else:
+                return match.group(0)
             page_dir = os.path.dirname(page.file.abs_src_path)
-            webp_path_abs = os.path.join(page_dir, real_relative_path)
-            if page.title == "广告":
-                breakpoint()
+            webp_path_abs = os.path.join(page_dir, real_webp_relative_path)
             if os.path.exists(webp_path_abs):
+                # if we can find the webp file, replace the url
                 return f"{mark}{png_path}.webp{mark}"
             else:
                 return match.group(0)
