@@ -6,6 +6,7 @@ from mkdocs.structure.files import File, Files
 
 import logging
 import os
+import re
 
 from mkdocs_cust.util import (
     add_target_blank_to_links,
@@ -38,10 +39,14 @@ class NotebookFile(File):
         return True
 
 
+# Check events: https://www.mkdocs.org/dev-guide/plugins/#events
+
+
 class CustPlugin(BasePlugin):
     config_scheme = (
         ("external_link_target_blank", config_options.Type(bool, default=True)),
         ("convert_ipynb", config_options.Type(bool, default=True)),
+        ("webp_redirect", config_options.Type(bool, default=True)),
     )
 
     def on_files(self, files, *, config):
@@ -73,3 +78,28 @@ class CustPlugin(BasePlugin):
             toc_tokens = get_toc_tokens(html)
             page.toc = get_toc(toc_tokens)
         return html
+
+    def on_post_page(self, output, *, page, config):
+        def replace_url(match):
+            nonlocal config
+            mark = match.group(1)  # ' or "
+            png_path = match.group(2)  # the path to the png image
+            ##########
+            # the png_path is relative to the page url, we need to convert it to absolute path
+            ##########
+            real_relative_path = os.path.join(*png_path.split(os.sep)[1:]) + ".webp"
+            page_dir = os.path.dirname(page.file.abs_src_path)
+            webp_path_abs = os.path.join(page_dir, real_relative_path)
+            if page.title == "广告":
+                breakpoint()
+            if os.path.exists(webp_path_abs):
+                return f"{mark}{png_path}.webp{mark}"
+            else:
+                return match.group(0)
+
+        if self.config["webp_redirect"]:
+            pattern = re.compile(
+                r"(?P<url>[\"\'])([^\"\']+?\.png)(?P=url)", re.IGNORECASE
+            )
+            return pattern.sub(replace_url, output)
+        return super().on_post_page(output, page=page, config=config)
