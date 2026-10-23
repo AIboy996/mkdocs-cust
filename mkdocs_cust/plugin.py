@@ -88,7 +88,13 @@ class CustPlugin(BasePlugin):
             credits = self._render_ai_coauthor_credit(ai_coauthors)
             output = re.sub(
                 r"</h1>",
-                lambda match: credits + match.group(0),
+                # The credit floats inside the <h1>, so it does not add to the
+                # heading's height. A clearing spacer below keeps following
+                # content (and mobile layouts) from overlapping the credit.
+                lambda match: credits + match.group(0) + (
+                    '<div aria-hidden="true" class="ai-coauthor-clearance" '
+                    'style="clear:both;height:0;margin:0;padding:0"></div>'
+                ),
                 output,
                 count=1,
                 flags=re.IGNORECASE,
