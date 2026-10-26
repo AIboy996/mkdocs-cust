@@ -168,10 +168,17 @@ class CustPlugin(BasePlugin):
 
     @staticmethod
     def _get_ai_coauthors(source_path, docs_dir):
-        """Return AI assistant names from the latest commit that changed a page."""
+        """Return the AI co-author with the most co-authored commits.
+
+        Counts are aggregated by recognized AI tool, not by the exact
+        ``Co-authored-by`` name/email, so variants such as "Claude" and
+        "Claude Code" belong to the same signer. Ties are broken by the AI
+        whose first co-authored commit is earliest.
+        """
         try:
             result = subprocess.run(
-                ["git", "log", "-1", "--format=%B", "--", os.path.relpath(source_path, docs_dir)],
+                ["git", "log", "--reverse", "--format=%B%x00", "--",
+                 os.path.relpath(source_path, docs_dir)],
                 cwd=docs_dir,
                 check=True,
                 capture_output=True,
@@ -191,24 +198,64 @@ class CustPlugin(BasePlugin):
             "Devin": ("devin",),
             "DeepSeek": ("dsh", "deepseek"),
         }
-        names = []
-        for line in result.stdout.splitlines():
-            match = re.match(r"\s*Co-authored-by:\s*(.*?)\s*<([^>]+)>\s*$", line, re.IGNORECASE)
-            if not match:
-                continue
-            name, email = match.groups()
-            identity = f"{name} {email}".lower()
-            display_name = next(
-                (
-                    tool
-                    for tool, keywords in ai_tools.items()
-                    if any(keyword in identity for keyword in keywords)
-                ),
-                None,
-            )
-            if display_name and display_name not in [coauthor[0] for coauthor in names]:
-                names.append((display_name, name.strip() or email.strip(), email.strip()))
-        return names
+
+        # Git log with --reverse lists commits oldest first, so the first time
+        # an AI is seen is its earliest commit. Keep the name/email from that
+        # occurrence for the credit popup.
+        stats = {}
+        for commit_index, message in enumerate(result.stdout.split("\0")):
+            commit_tools = {}
+            for line_index, line in enumerate(message.splitlines()):
+                match = re.match(r"\s*Co-authored-by:\s*(.*?)\s*<([^>]+)>\s*$", line, re.IGNORECASE)
+                if not match:
+                    continue
+                name, email = match.groups()
+                identity_text = f"{name} {email}".lower()
+                display_name = next(
+                    (
+                        tool
+                        for tool, keywords in ai_tools.items()
+                        if any(keyword in identity_text for keyword in keywords)
+                    ),
+                    None,
+                )
+                # Count each AI once per commit, even if it appears more than
+                # once (or under different names) in the same commit.
+                if display_name and display_name not in commit_tools:
+                    commit_tools[display_name] = (
+                        name.strip() or email.strip(),
+                        email.strip(),
+                        line_index,
+                    )
+
+            for tool, (name, email, line_index) in commit_tools.items():
+                entry = stats.get(tool)
+                if entry is None:
+                    stats[tool] = {
+                        "count": 1,
+                        "first_index": commit_index,
+                        "first_line": line_index,
+                        "name": name,
+                        "email": email,
+                    }
+                else:
+                    entry["count"] += 1
+
+        if not stats:
+            return []
+
+        # Highest commit count wins. On a tie, the smaller first_index wins
+        # (earliest commit); if both first appear in the same commit, the
+        # trailer that appears first breaks the tie.
+        tool, entry = max(
+            stats.items(),
+            key=lambda item: (
+                item[1]["count"],
+                -item[1]["first_index"],
+                -item[1]["first_line"],
+            ),
+        )
+        return [(tool, entry["name"], entry["email"])]
 
     @staticmethod
     def right_replace(s, old, new, occurrence):
